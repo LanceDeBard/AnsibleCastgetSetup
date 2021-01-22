@@ -1,0 +1,57 @@
+---
+- name: Install and Configure Castget
+  hosts: otaserver
+  vars_files:
+    - vars/vars.yml
+    - vars/podcasts.yml
+  tasks:
+    - name: Install Castget and prereqs
+      package:
+        name: "{{ item }}"
+        state: latest
+      with_items:
+        - glib2
+        - libxml2
+        - curl
+        - id3lib
+        - castget
+
+    - name: Make sure Podcast directory exists and has the right permissions
+      file:
+        state: directory
+        group: "{{ user }}"
+        owner: "{{ user }}"
+        path: "{{ podcastsd }}"
+        mode: "774"
+
+    - name: create podcast subdirectories
+      file:
+        state: directory
+        group: "{{ user }}"
+        owner: "{{ user }}"
+        path: "{{ podcastsd }}/{{ item.key }}"
+      loop: "{{ podcasts | dict2items }}"
+
+    - name: template castget configuration file
+      blockinfile:
+        block: |
+          [{{ item.key }}]
+          url={{ item.value }}
+          spool={{ podcastsd }}/{{ item.key }}
+
+        path: /home/{{ user }}/.castgetrc
+        state: present
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        marker: "# {mark} {{ item.key }}"
+        create: true
+        insertbefore: BOF
+      loop: "{{ podcasts | dict2items }}"
+
+    - name: add castget to crontab for {{ user }}
+      cron:
+        name: "Download most recent podcasts"
+        user: "{{ user }}"
+        state: present
+        minute: "30,0"
+        job: "castget -1"
