@@ -1,0 +1,38 @@
+---
+- name: Convert podcast.vars into OPML format
+  hosts: otaserver
+  vars_files:
+    - vars/podcasts.yml
+  vars: 
+    podfile: /home/lance/Documents/podcasts.yml
+  tasks:
+    - name: create opml file
+      file:
+        path: "{{ podfile }}"
+        state: touch
+
+    - name: Write OPML header
+      blockinfile:
+        path: /home/lance/Documents/podcasts.yml 
+        marker: "# {mark} starting block"
+        block: |
+          <opml>
+          <head/>
+          <body>
+          <outline title="Castget OPML subscription file" text="Subbed pods">
+
+    - name: Write OPML Body
+      lineinfile:
+        path: "{{ podfile }}"
+        insertafter: <outline title="Castget OPML subscription file" text="Subbed pods">
+        line: <outline title="{{ item.key }}" type="rss" htmlUrl="{{ item.value }}"
+      loop: "{{ podcasts | dict2items }}"
+
+    - name: Write OPML Footer
+      blockinfile:
+        marker: " # {mark} ending block"
+        path: "{{ podfile }}"
+        block: |
+          </outline>
+          </body>
+          </opml>
